@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>Websocket Draw</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="script/script.js" type="text/javascript"></script>
+        <link href="style.css" rel="stylesheet" type="text/css"/>
+    </head>
+    <body>
+        <div>
+            <input type="text" id="usernameInput" placeholder="Enter Username">
+            <input type="button" id="submitUsernameBtn" value="Send">
+        </div>
+        <div>
+            <textarea readonly="readonly" cols="55" rows="10" id="messageArea"></textarea>
+            <textarea readonly="readonly" cols="25" rows="10" id="userList"></textarea>
+        </div>
+        <div>
+            <input type="text" id="messageInput" placeholder="Enter Message"/>
+            <input type="button" id="submitMessageBtn" onclick="sendMessage()" value="Send">
+        </div>
+
+
+        <canvas id="canvas" width="400" height="400"></canvas>
+
+    </body>
+</html>
