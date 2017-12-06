@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package draw.websocket;
 
 import java.io.IOException;
@@ -20,10 +15,7 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 
-/**
- *
- * @author milooyaguez karlsson
- */
+
 @ServerEndpoint("/draw")
 public class DrawServerEndpoint {
 
@@ -32,15 +24,22 @@ public class DrawServerEndpoint {
 
     @OnOpen
     public void open(Session user) throws IOException {
+        //random för att få en random färg från en array med 5 färger
         Random rnd = new Random();
         int rndNr = rnd.nextInt(5);
 
         user.getUserProperties().put("color", colors[rndNr]);
-        user.getUserProperties().put("username", "unknown");
+        //default användarnamn är unknown till användaren ändrar
+        user.getUserProperties().put("username", "unknown"); 
         sessions.add(user);
-
-        user.getBasicRemote().sendText(buildUserData());
+        //välkommst meddelande
+        user.getBasicRemote().sendText(buildMessageData("System", "Welcome!"));
+        //skicka att användaren har kommit in och uppdatera användarlistan
         for (Session session : sessions) {
+            if (session != user) { //ska bara skicka till alla ANDRA
+                session.getBasicRemote().sendText(buildMessageData("System",
+                        user.getUserProperties().get("username") + " has joined."));
+            }
             session.getBasicRemote().sendText(buildUserData());
         }
     }
@@ -48,28 +47,37 @@ public class DrawServerEndpoint {
     @OnClose
     public void close(Session user) throws IOException {
         sessions.remove(user);
+        //skicka utt meddelande till alla att användaren har lämnat
+        //och uppdatera listan med användare
         for (Session session : sessions) {
+            session.getBasicRemote().sendText(buildMessageData("System",
+                    user.getUserProperties().get("username") + " has left."));
             session.getBasicRemote().sendText(buildUserData());
         }
     }
 
     @OnMessage
     public String onMessage(String message, Session user) throws IOException {
+        //läsa in strängen och göra om det till ett jsonObjekt
         JsonReader jsonReader = Json.createReader(new StringReader(message));
         JsonObject messageJson = jsonReader.readObject();
         jsonReader.close();
+        //göra olika saker med meddelandet beroende på vilken typ a meddelande det är
+        //om det är användarnamn-ändring ska användarnamnet ändras och 
+        //listan av användare ska uppdateras och skickas ut igen
         if (messageJson.getString("type").equals("username")) {
+            //ändra användarnamnet
             user.getUserProperties().replace("username", messageJson.getString("username"));
             for (Session session : sessions) {
                 session.getBasicRemote().sendText(buildUserData());
             }
-        } else if (messageJson.getString("type").equals("draw")) {
+        } else if (messageJson.getString("type").equals("draw")) { //rita-meddelanden
             for (Session session : sessions) {
                 session.getBasicRemote().sendText(buildDrawData(user, message));
             }
-        } else if(messageJson.getString("type").equals("message")){
+        } else if (messageJson.getString("type").equals("message")) { //text-meddelanden
             for (Session session : sessions) {
-                String username = (String) user.getUserProperties().get("username");
+                String username = (String) user.getUserProperties().get("username"); //vem som skriver
                 session.getBasicRemote().sendText(buildMessageData(username, messageJson.getString("message")));
             }
         }
@@ -77,7 +85,8 @@ public class DrawServerEndpoint {
         return null;
     }
 
-    private String buildMessageData(String username, String message){
+    //funktion för att bygga meddelanden som jsonobjekt
+    private String buildMessageData(String username, String message) {
         String completeMessage = String.format("%s: %s", username, message);
         JsonObject jsonObject = Json.createObjectBuilder()
                 .add("type", "message")
@@ -85,6 +94,8 @@ public class DrawServerEndpoint {
 
         return jsonObject.toString();
     }
+
+    //funktion för att bygga ett jsonobject som representerar en punkt som ska ritas ut av klienten
     private String buildDrawData(Session user, String message) {
         JsonReader jsonReader = Json.createReader(new StringReader(message));
         JsonObject positions = jsonReader.readObject();
@@ -97,6 +108,8 @@ public class DrawServerEndpoint {
                 .add("y", positions.getInt("y")).build();
         return jsonObject.toString();
     }
+
+    //funktion för att bygga en array med jsonobjekt som är alla användare/sessioner
     private String buildUserData() {
         JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
         for (Session session : sessions) {
