@@ -2,6 +2,7 @@ package draw.websocket;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -21,6 +22,7 @@ public class DrawServerEndpoint {
 
     static Set<Session> sessions = new HashSet<>();
     static String[] colors = {"red", "green", "blue", "yellow", "purple"};
+    static int clearVotes = 0;
 
     @OnOpen
     public void open(Session user) throws IOException {
@@ -66,6 +68,18 @@ public class DrawServerEndpoint {
         //om det är användarnamn-ändring ska användarnamnet ändras och 
         //listan av användare ska uppdateras och skickas ut igen
         if (messageJson.getString("type").equals("username")) {
+            //bekräftning att användarnamnet har ändrats
+            user.getBasicRemote().sendText(buildMessageData("System", 
+                    "username changed to " + messageJson.getString("username")));
+            //skicka till alla andra att användaren har bytt användarnamn
+            for (Session session : sessions) {
+                if(user != session){
+                    session.getBasicRemote().sendText(buildMessageData("System",
+                            user.getUserProperties().get("username").toString() 
+                                    + " has changed username to " 
+                                    + messageJson.getString("username")));
+                }
+            }
             //ändra användarnamnet
             user.getUserProperties().replace("username", messageJson.getString("username"));
             for (Session session : sessions) {
@@ -80,22 +94,44 @@ public class DrawServerEndpoint {
                 String username = (String) user.getUserProperties().get("username"); //vem som skriver
                 session.getBasicRemote().sendText(buildMessageData(username, messageJson.getString("message")));
             }
+        } else if(messageJson.getString("type").equals("vote_clear")){ //röst för att rensa canvas
+            int requiredVotes = sessions.size();
+            clearVotes++;
+            for(Session session: sessions){
+                String username = (String) user.getUserProperties().get("username"); //vem som skriver
+                session.getBasicRemote().sendText(buildMessageData("System", username + " has voted to clear " + clearVotes + "/" + requiredVotes));
+            }
+            //om alla röstar för att rensa
+            if(clearVotes == requiredVotes){
+                clearVotes = 0; //reseta
+                //skicka ut rensnings "order" till alla användare
+                for(Session session: sessions){
+                    session.getBasicRemote().sendText(buildClearData());
+                }
+            }
         }
 
         return null;
     }
+    
+    //metod för att bugga jsonobjekt för att rensa canvasen
+    private String buildClearData(){
+        JsonObject jsonObject = Json.createObjectBuilder()
+                .add("type", "clear")
+                .build();
+        return jsonObject.toString();
+    }
 
-    //funktion för att bygga meddelanden som jsonobjekt
+    //metod för att bygga meddelanden som jsonobjekt
     private String buildMessageData(String username, String message) {
         String completeMessage = String.format("%s: %s", username, message);
         JsonObject jsonObject = Json.createObjectBuilder()
                 .add("type", "message")
                 .add("message", completeMessage).build();
-
         return jsonObject.toString();
     }
 
-    //funktion för att bygga ett jsonobject som representerar en punkt som ska ritas ut av klienten
+    //metod för att bygga ett jsonobject som representerar en punkt som ska ritas ut av klienten
     private String buildDrawData(Session user, String message) {
         JsonReader jsonReader = Json.createReader(new StringReader(message));
         JsonObject positions = jsonReader.readObject();
@@ -109,7 +145,7 @@ public class DrawServerEndpoint {
         return jsonObject.toString();
     }
 
-    //funktion för att bygga en array med jsonobjekt som är alla användare/sessioner
+    //metod för att bygga en array med jsonobjekt som är alla användare/sessioner
     private String buildUserData() {
         JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
         for (Session session : sessions) {

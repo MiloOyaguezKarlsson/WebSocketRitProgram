@@ -5,8 +5,9 @@ var drawDot = false; //för att rita en punkt om man bara enkelklickar
 var url = "ws://localhost:8080/WebSocketRitProgram/draw";
 
 //ville göra detta i samband med att ett användarnamn skrevs in men fick då
-// problem men att användarnamnet skickades innan uppkopplingen fanns
-var websocket = new WebSocket(url); 
+//problem med att användarnamnet skickades innan uppkopplingen fanns
+var websocket = new WebSocket(url);
+;
 
 window.onload = function () {
     canvas = document.getElementById("canvas");
@@ -32,9 +33,14 @@ window.onload = function () {
         sendUsername(username);
         document.getElementById("usernameInput").value = "";
     });
-    //detta funkar inte av någon anledning men onclick på button-elementet gör
-    //det funkar även på knappen som skickar in användarnamnet
-    document.getElementById("submitMessageBtn").addEventListener("click", sendMessage());
+    document.getElementById("voteClearBtn").addEventListener("click", function () {
+        sendClearVote();
+    });
+    document.getElementById("submitMessageBtn").addEventListener("click", function () {
+        var message = document.getElementById("messageInput").value; //hämtar meddelandet
+        document.getElementById("messageInput").value = "";
+        sendMessage(message);
+    });
 };
 //funktion för att rita
 //ritar en iffyld cirkel i en specifik färg vid den koordinaten som tas emot
@@ -65,8 +71,12 @@ function findxy(event, e) {
         }
     }
 }
+//funktion för att rensa canvasen
+function clearCanvas() {
+    ctx.clearRect(0, 0, width, height);
+}
 //funktion för att bara mata in meddelanden i meddelanderutan
-function updateMessages(message){
+function updateMessages(message) {
     document.getElementById("messageArea").value += message + "\n";
 }
 //funktion för att skicka in koordinater som ska ritas
@@ -80,11 +90,13 @@ function sendUsername(username) {
     websocket.send(JSON.stringify(jsonData));
 }
 //funktion för att skicka meddelanden
-function sendMessage(){
-    var message = document.getElementById("messageInput").value; //hämtar meddelandet
-    document.getElementById("messageInput").value = ""; //funkar inte av någon anledning???
+function sendMessage(message) {
     var jsonData = {type: "message", message: message};
     websocket.send(JSON.stringify(jsonData));//funkar
+}
+function sendClearVote() {
+    var jsonData = {type: "vote_clear"};
+    websocket.send(JSON.stringify(jsonData));
 }
 websocket.onmessage = function processMessage(message) {
     var jsonData = JSON.parse(message.data);
@@ -93,22 +105,26 @@ websocket.onmessage = function processMessage(message) {
     if (Array.isArray(jsonData)) {
         //skapa en lista med användare och mata in i användar rutan
         var output = "";
-        for(var i = 0; i < jsonData.length; i++){
+        for (var i = 0; i < jsonData.length; i++) {
             output += jsonData[i].username + "(" + jsonData[i].color + ")\n";
         }
         document.getElementById("userList").value = output;
     } else {
         //koordinater
-        if(jsonData.type === "draw"){
+        if (jsonData.type === "draw") {
             //rita ut koordinaterna i den färgen som användaren har
-            draw(jsonData.color, jsonData.x, jsonData.y); 
-        } 
+            draw(jsonData.color, jsonData.x, jsonData.y);
+        }
         //meddelanden
-        else if(jsonData.type === "message") {
+        else if (jsonData.type === "message") {
             //mata in meddelanden i meddelanderutan
             updateMessages(jsonData.message);
         }
-            
+        //rensnings "order"
+        else if (jsonData.type === "clear") {
+            clearCanvas();
+        }
+
     }
 };
 
